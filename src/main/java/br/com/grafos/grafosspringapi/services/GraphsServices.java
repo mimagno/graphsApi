@@ -17,7 +17,7 @@ public class GraphsServices {
 	private String corPessoa = "#1C75CF";
 	private BuildGraphsTools buildGraphsTools = new BuildGraphsTools();
 
-	public JsonObject buildGraphs(JsonObject body){
+	public JsonObject buildGraphs(JsonObject body, String type){
 		int tier = body.get("camada").getAsInt();
 		String indiceTitle = body.get("tituloIndice").getAsString();
 		RestClient restClient = buildClientForGraphs(indiceTitle);
@@ -36,12 +36,11 @@ public class GraphsServices {
 
 		//revisar (são passados para criar o primeiro node)
 		String id = body.get("id").getAsString();
-		String type = buildGraphsTools.detectType(id);
 		String index = body.get("nomeIndice").getAsString();
 		String name = body.get("empresa").toString();
 
 		JsonObject rootNode = null;
-		if (body.get("tipo").getAsString().equals("empresa")) {
+		if (type.equals("empresa")) {
 			JsonObject company = this.getMatrizCompany(id, name, restClient, index);
 			rootNode = this.setUpNode(company.get("cnpj").toString(), company.get("companyName").toString(), this.size, type, index, restClient);
 		} else {
