@@ -38,13 +38,14 @@ public class GraphsServices {
 		String id = body.get("id").getAsString();
 		String type = buildGraphsTools.detectType(id);
 		String index = body.get("nomeIndice").getAsString();
+		String name = body.get("empresa").toString();
 
 		JsonObject rootNode = null;
 		if (body.get("tipo").getAsString().equals("empresa")) {
-			JsonObject company = this.getMatrizCompany(id, body.get("empresa").toString(), restClient, index);
+			JsonObject company = this.getMatrizCompany(id, name, restClient, index);
 			rootNode = this.setUpNode(company.get("cnpj").toString(), company.get("companyName").toString(), this.size, type, index, restClient);
 		} else {
-			//requisita o socio
+			rootNode = this.setUpNode(id, name, this.size, type, index, restClient);
 		}
 		
 		

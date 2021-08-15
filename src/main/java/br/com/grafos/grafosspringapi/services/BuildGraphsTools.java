@@ -20,8 +20,8 @@ public class BuildGraphsTools {
 		}
 		return type;
 	}
-public JsonArray businessPartnersRequest(String query, RestClient rC, String indice) {
-		ResponseEntity<?> requestResponse = rC.post(indice + "/_search", query);
+public JsonArray businessPartnersRequest(String query, RestClient restClient, String indice) {
+		ResponseEntity<?> requestResponse = restClient.post(indice + "/_search", query);
 
 		JsonParser parse = new JsonParser();
 
@@ -50,7 +50,6 @@ public JsonArray businessPartnersRequest(String query, RestClient rC, String ind
 		ResponseEntity<?> requestResponse = restClient.post(indice + "/_search", query);
 
 		JsonObject bodyResponse = parse.parse((String) requestResponse.getBody()).getAsJsonObject();
-
 		JsonArray hits = bodyResponse.get("hits").getAsJsonObject().get("hits").getAsJsonArray();
 		
 		return hits;
