@@ -1,9 +1,9 @@
 package br.com.grafos.grafosspringapi.services;
 
-
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+
 
 import org.springframework.http.ResponseEntity;
 
@@ -11,7 +11,9 @@ import br.com.grafos.grafosspringapi.Util.RestClient;
 
 public class BuildGraphsTools {
 
-     public String detectType(String id) {
+	private JsonParser parser = new JsonParser();
+
+	public String detectType(String id) {
 		String type;
 		if (id.indexOf('*') > -1) {
 			type = "pessoa";
@@ -20,12 +22,44 @@ public class BuildGraphsTools {
 		}
 		return type;
 	}
-public JsonArray businessPartnersRequest(String query, RestClient restClient, String indice) {
+
+	public String getCompanySituation(String id, RestClient restClient, String index) {
+		String query = "{\"size\":1000,\"query\":{\"bool\":{\"must\":[{\"match\":{\"cnpj.keyword\":\"" + id +"\"}}]}}}";
+		ResponseEntity<?> requestResponse = restClient.post(index + "/_search", query);
+
+		JsonObject bodyResponse = this.parser.parse((String) requestResponse.getBody()).getAsJsonObject();
+
+		JsonArray hits = bodyResponse.get("hits").getAsJsonObject().get("hits").getAsJsonArray();
+
+		JsonObject hit = hits.get(0).getAsJsonObject();
+
+		String sutuation = hit.get("_source").getAsJsonObject().get("situacaoCadastral").getAsString();
+		return sutuation;
+	}
+
+	public JsonObject getMatrizCompany(String cnpj, String companyName, RestClient restClient, String index){
+		JsonObject company = new JsonObject();
+		String matriz_filial = cnpj.substring(8, 12);
+		if (!matriz_filial.equals("0001")) {
+			cnpj = cnpj.substring(0, 8) + "0001";
+			String query = "{\"query\":{\"multi_match\":{\"query\":\"" + cnpj + "\",\"type\":\"phrase_prefix\"}},\"size\":10,\"from\":0}";
+
+			JsonObject matriz = sourceRequest(query, restClient, index).get(0).getAsJsonObject();
+			company.addProperty("cnpj", matriz.get("_source").getAsJsonObject().get("cnpj").getAsString());
+			company.addProperty("companyName", matriz.get("_source").getAsJsonObject().get("razaoSocial").getAsString());
+		} else {
+			company.addProperty("cnpj", cnpj);
+			company.addProperty("companyName", companyName);
+		}
+		return company;
+	}
+
+	public JsonArray businessPartnersRequest(String cnpj, RestClient restClient, String indice) {
+		String query = "{\"size\":1000,\"query\":{\"bool\":{\"must\":[{\"match\":{\"cnpj.keyword\":\"" + cnpj
+				+ "\"}}]}}}";
+
 		ResponseEntity<?> requestResponse = restClient.post(indice + "/_search", query);
-
-		JsonParser parse = new JsonParser();
-
-		JsonObject requestResponseJson = parse.parse((String) requestResponse.getBody()).getAsJsonObject();
+		JsonObject requestResponseJson = this.parser.parse((String) requestResponse.getBody()).getAsJsonObject();
 		JsonObject hits = requestResponseJson.get("hits").getAsJsonObject();
 		JsonArray company = hits.get("hits").getAsJsonArray();
 
@@ -42,16 +76,37 @@ public JsonArray businessPartnersRequest(String query, RestClient restClient, St
 		}
 		return businessPartnersFinalArray;
 	}
-	
 
-	public JsonArray sourceRequest(String query, RestClient restClient, String indice) {
-		JsonParser parse = new JsonParser();
+	public JsonArray partnersBusinessRequest(JsonObject partner, RestClient restClient, String indice) {
+		String query ="{\"size\":1000, \"query\":{\"bool\":{\"must\":[{\"match\":{\"socios.nomeSocio.keyword\":\"" + partner.get("label").getAsString() + "\"}},"
+		+ "{\"match\":{\"socios.cnpj_cpfSocio.keyword\":\"" + splitId(partner.get("id").getAsString()) + "\"}},"
+		+ "{\"match\":{\"matriz_filial.keyword\":\"MATRIZ\"}}]}}}";
 
 		ResponseEntity<?> requestResponse = restClient.post(indice + "/_search", query);
+		JsonObject requestResponseJson = this.parser.parse((String) requestResponse.getBody()).getAsJsonObject();
+		JsonObject hits = requestResponseJson.get("hits").getAsJsonObject();
+		JsonArray company = hits.get("hits").getAsJsonArray();
 
-		JsonObject bodyResponse = parse.parse((String) requestResponse.getBody()).getAsJsonObject();
+		JsonObject fullDocument = company.get(0).getAsJsonObject();
+		JsonObject sourceDocument = fullDocument.get("_source").getAsJsonObject();
+		JsonArray businessPartenrsArray = sourceDocument.get("socios").getAsJsonArray();
+		String cor = getCor(sourceDocument.get("situacaoCadastral").getAsString());
+		JsonArray businessPartnersFinalArray = new JsonArray();
+
+		for (int i = 0; i < businessPartenrsArray.size(); i++) {
+			JsonObject businessPartner = businessPartenrsArray.get(i).getAsJsonObject();
+			businessPartner.addProperty("color", cor);
+			businessPartnersFinalArray.add(businessPartner);
+		}
+		return businessPartnersFinalArray;
+	}
+
+	public JsonArray sourceRequest(String query, RestClient restClient, String indice) {
+		ResponseEntity<?> requestResponse = restClient.post(indice + "/_search", query);
+
+		JsonObject bodyResponse = this.parser.parse((String) requestResponse.getBody()).getAsJsonObject();
 		JsonArray hits = bodyResponse.get("hits").getAsJsonObject().get("hits").getAsJsonArray();
-		
+
 		return hits;
 	}
 
@@ -72,5 +127,29 @@ public JsonArray businessPartnersRequest(String query, RestClient restClient, St
 			cor = "#FFFFFF";
 		}
 		return cor;
+	}
+
+	public boolean verifyExists(JsonArray entities, String id) {
+		for (int count = 0; count < entities.size(); count++) {
+			JsonObject entity = entities.get(count).getAsJsonObject();
+			if (entity.get("id").toString().equals(id)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	public String splitId(String id) {
+		if (id.contains("_")){
+			String[] idSplit = id.trim().split("_");
+			id = idSplit[0];
+		}
+		return id;
+	}
+
+	public String findNodeType(JsonObject currentNode) {
+		String id = splitId(currentNode.get("id").getAsString());
+		String type = detectType(id);
+		return type;
 	}
 }

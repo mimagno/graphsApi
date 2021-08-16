@@ -6,10 +6,11 @@ import java.util.LinkedList;
 import java.util.Queue;
 
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 
 import br.com.grafos.grafosspringapi.Util.RestClient;
+import ch.qos.logback.core.recovery.ResilientSyslogOutputStream;
 
 public class GraphsServices {
 
@@ -17,7 +18,7 @@ public class GraphsServices {
 	private String corPessoa = "#1C75CF";
 	private BuildGraphsTools buildGraphsTools = new BuildGraphsTools();
 
-	public JsonObject buildGraphs(JsonObject body, String type){
+	public JsonObject buildGraphs(JsonObject body, String type) {
 		int tier = body.get("camada").getAsInt();
 		String indiceTitle = body.get("tituloIndice").getAsString();
 		RestClient restClient = buildClientForGraphs(indiceTitle);
@@ -25,7 +26,7 @@ public class GraphsServices {
 		Queue<JsonObject> queueNodes = new LinkedList<JsonObject>();
 
 		JsonObject graph = new JsonObject();
-		//visiteds
+		// visiteds
 		JsonArray nodes = new JsonArray();
 		JsonArray edges = new JsonArray();
 
@@ -34,107 +35,132 @@ public class GraphsServices {
 			this.size = this.size / 2;
 		}
 
-		//revisar (são passados para criar o primeiro node)
+		// revisar (são passados para criar o primeiro node)
 		String id = body.get("id").getAsString();
 		String index = body.get("nomeIndice").getAsString();
-		String name = body.get("empresa").toString();
+		String name = body.get("empresa").getAsString();
 
 		JsonObject rootNode = null;
+		int level = 0;
 		if (type.equals("empresa")) {
-			JsonObject company = this.getMatrizCompany(id, name, restClient, index);
-			rootNode = this.setUpNode(company.get("cnpj").toString(), company.get("companyName").toString(), this.size, type, index, restClient);
+			id = buildGraphsTools.splitId(id);
+			JsonObject company = buildGraphsTools.getMatrizCompany(id, name, restClient, index);
+			id = company.get("cnpj").getAsString();
+			name = company.get("companyName").getAsString();
+			rootNode = this.setUpNode(id, name, this.size, type, index, level, restClient);
 		} else {
-			rootNode = this.setUpNode(id, name, this.size, type, index, restClient);
+			rootNode = this.setUpNode(id, name, this.size, type, index, level, restClient);
 		}
-		
-		
-		nodes.add(rootNode);
-		queueNodes.add(rootNode);
 
+		queueNodes.add(rootNode);
+		nodes.add(rootNode);
+		JsonObject edge;
 		JsonObject currentNode;
-		while((currentNode = queueNodes.poll()) != null ){
-			System.out.println(currentNode.toString());
+		while ((currentNode = queueNodes.poll()) != null) {
+			type = buildGraphsTools.findNodeType(currentNode);
+			level = currentNode.get("level").getAsInt();
+			level++;
+			if (level <= tier) {
+
+				id = currentNode.get("id").getAsString();
+
+				if (type.equals("empresa")) {
+
+					JsonArray partners = buildGraphsTools.businessPartnersRequest(id, restClient, index);
+
+					for (int count = 0; count < partners.size(); count++) {
+						JsonObject partner = partners.get(count).getAsJsonObject();
+						id = partner.get("cnpj_cpfSocio").getAsString();
+						if (!buildGraphsTools.verifyExists(nodes, id)) {
+							name = partner.get("nomeSocio").getAsString();
+							type = buildGraphsTools.detectType(id);
+
+							partner = setUpNode(id, name, size, type, index, level, restClient);
+
+							nodes.add(partner);
+
+							queueNodes.add(partner);
+							edge = setUpEdge(partner, currentNode);
+
+							edges.add(edge);
+
+						}
+					}
+
+				} else {
+					// this is a people node.
+					JsonArray companies = buildGraphsTools.partnersBusinessRequest(currentNode, restClient, index);
+					System.out.println("aaaaaaaaaaaa " + companies.toString());
+					for (int count = 0; count < companies.size(); count++) {
+						JsonObject company = companies.get(count).getAsJsonObject();
+						id = company.get("cnpj").getAsString();
+						if (!buildGraphsTools.verifyExists(nodes, id)) {
+							name = company.get("razaoSocial").getAsString();
+
+							company = setUpNode(id, name, size, type, index, level, restClient);
+
+							nodes.add(company);
+
+							queueNodes.add(company);
+
+							// ver ordem
+							edge = setUpEdge(currentNode, company);
+
+							edges.add(edge);
+						}
+					}
+				}
+			}
 		}
-		
+
 		graph.add("nodes", nodes);
 		graph.add("edges", edges);
 
 		return graph;
 	}
 
-
-	public JsonObject setUpNode(String id, String nome, int size, String tipo,
-		String indice, RestClient restCliente) {
+	public JsonObject setUpNode(String id, String name, int size, String type, String index, int level,
+			RestClient restClient) {
 		JsonObject node = new JsonObject();
 		node.addProperty("id", id);
-		node.addProperty("label", nome);
+		node.addProperty("label", name);
 		node.addProperty("size", size);
-		node.addProperty("tipo", tipo);
+		node.addProperty("tipo", type);
+		node.addProperty("level", level);
 		if (node.get("tipo").getAsString().equals("pessoa")) {
 			node.addProperty("color", this.corPessoa);
 		} else {
-			node.addProperty("color", buildGraphsTools.getCor(getCompanySituation(id, restCliente, indice)));
+			node.addProperty("color",
+					buildGraphsTools.getCor(buildGraphsTools.getCompanySituation(id, restClient, index)));
 		}
 		return node;
 	}
 
-	public JsonObject setUpEdge(String id, int forController, JsonObject socio, JsonArray socios) {
+	public JsonObject setUpEdge(JsonObject nodeOrigin, JsonObject nodeTarget) {
+
+		// Setup Edge from nodeOrigin to nodeTarget
 		JsonObject edge = new JsonObject();
-				edge.addProperty("id", socio.get("id").getAsString() + "_" + id);
-				edge.addProperty("source", socio.get("id").getAsString());
-				edge.addProperty("target", id);
-				edge.addProperty("label", " ");
-				// SE MUDAR ESSE VALOR ELA FICA CURVA OU RETA
-				edge.addProperty("type", "arrow");
-				edge.addProperty("size", 1);
-				edge.addProperty("color", socios.get(forController).getAsJsonObject().get("color").getAsString());
+		edge.addProperty("id", nodeTarget.get("id").getAsString() + "_" + nodeOrigin.get("id").getAsString());
+		edge.addProperty("source", nodeOrigin.get("id").getAsString());
+		edge.addProperty("target", nodeTarget.get("id").getAsString());
+		edge.addProperty("label", " ");
+		// IF YOU CHANGE THIS VALUE IT IS CURVED OR STRAIGHT
+		edge.addProperty("type", "arrow");
+		edge.addProperty("size", 1);
+		edge.addProperty("color", nodeOrigin.get("color").getAsString());
 
-		return null;
+		return edge;
 
 	}
-	
-	public String getCompanySituation(String id, RestClient restClient, String index) {
-		JsonParser parse = new JsonParser();
-		String query = "{\"size\":1000,\"query\":{\"bool\":{\"must\":[{\"match\":{\"cnpj.keyword\":\"" + id
-				+ "\"}}]}}}";
-		ResponseEntity<?> requestResponse = restClient.post(index + "/_search", query);
 
-		JsonObject bodyResponse = parse.parse((String) requestResponse.getBody()).getAsJsonObject();
-
-		JsonArray hits = bodyResponse.get("hits").getAsJsonObject().get("hits").getAsJsonArray();
-
-		JsonObject hit = hits.get(0).getAsJsonObject();
-
-		String sutuation = hit.get("_source").getAsJsonObject().get("situacaoCadastral").getAsString();
-		return sutuation;
-	}
-
-	
-	private RestClient buildClientForGraphs(String indiceTitle){
+	private RestClient buildClientForGraphs(String indiceTitle) {
 		RestClient restClient;
 		if (indiceTitle.contains("*")) {
 			restClient = new RestClient("http://xtrdb01.consiste.com.br:9200/");
 		} else {
 			restClient = new RestClient();
-		}	
-		return restClient;
-	}
-
-	private JsonObject getMatrizCompany(String cnpj, String companyName, RestClient restClient, String index){
-		JsonObject company = new JsonObject();
-		String matriz_filial = cnpj.substring(8, 12);
-		if (!matriz_filial.equals("0001")) {
-			cnpj = cnpj.substring(0, 8) + "0001";
-			String query = "{\"query\":{\"multi_match\":{\"query\":\"" + cnpj + "\",\"type\":\"phrase_prefix\"}},\"size\":10,\"from\":0}";
-
-			JsonObject matriz = buildGraphsTools.sourceRequest(query, restClient, index).get(0).getAsJsonObject();
-			company.addProperty("cnpj", matriz.get("_source").getAsJsonObject().get("cnpj").getAsString());
-			company.addProperty("companyName", matriz.get("_source").getAsJsonObject().get("razaoSocial").getAsString());
-		} else {
-			company.addProperty("cnpj", cnpj);
-			company.addProperty("companyName", companyName);
 		}
-		return company;
+		return restClient;
 	}
 
 }
