@@ -11,6 +11,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 import br.com.grafos.grafosspringapi.Util.RestClient;
+import ch.qos.logback.core.joran.conditional.ElseAction;
 import ch.qos.logback.core.recovery.ResilientSyslogOutputStream;
 
 public class GraphsServices {
@@ -70,7 +71,13 @@ public class GraphsServices {
 					JsonArray partners = buildGraphsTools.businessPartnersRequest(id, restClient, index);
 					for (int count = 0; count < partners.size(); count++) {
 						JsonObject partner = partners.get(count).getAsJsonObject();
+
+						if (partner.get("cnpj_cpfSocio").getAsString().length() == 14){
+						id = partner.get("cnpj_cpfSocio").getAsString();
+						} else {
 						id = partner.get("cnpj_cpfSocio").getAsString() + "_" + partner.get("nomeSocio").getAsString();
+						}
+						
 						if (!buildGraphsTools.verifyExists(nodes, id)) {
 							name = partner.get("nomeSocio").getAsString();
 							type = buildGraphsTools.detectType(id);
@@ -120,9 +127,6 @@ public class GraphsServices {
 
 	public JsonObject setUpNode(String id, String name, int size, String type, String index, int level,
 			RestClient restClient) {
-		
-		id = buildGraphsTools.getPartnerCompanyCnpj(id);
-
 		JsonObject node = new JsonObject();
 		node.addProperty("id", id);
 		node.addProperty("label", name);

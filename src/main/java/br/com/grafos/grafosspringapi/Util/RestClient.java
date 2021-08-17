@@ -9,7 +9,7 @@ import org.springframework.web.client.RestTemplate;
 
 public class RestClient {
 
-	private String server = "http://xtr-verde.consiste.com.br:9200/";
+	private String server;
 	private RestTemplate rest;
 	private HttpHeaders headers;
 	private HttpStatus status;
@@ -29,38 +29,12 @@ public class RestClient {
 		headers.add("Content-Type", "application/json;charset=UTF-8");
 		headers.add("Accept", "*/*");
 	}
-	
-	public ResponseEntity<?> get(String uri) {
-	    HttpEntity<String> requestEntity = new HttpEntity<String>("", headers);
-	    ResponseEntity<String> responseEntity = rest.exchange(server + uri, HttpMethod.GET, requestEntity, String.class);
-	    this.setStatus(responseEntity.getStatusCode());
-	    return responseEntity;
-	  }
-	
-	public ResponseEntity<?> get(String uri, String query) {
-	    HttpEntity<String> requestEntity = new HttpEntity<String>("", headers);
-	    ResponseEntity<String> responseEntity = rest.getForEntity(server + uri, String.class, query);
-	    this.setStatus(responseEntity.getStatusCode());
-	    return responseEntity;
-	  } 
 
 	  public ResponseEntity<?> post(String uri, String json) {   
 	    HttpEntity<String> requestEntity = new HttpEntity<String>(json, headers);
 	    ResponseEntity<String> responseEntity = rest.exchange(server + uri, HttpMethod.POST, requestEntity, String.class);
 	    this.setStatus(responseEntity.getStatusCode());
 	    return responseEntity;
-	  }
-
-	  public void put(String uri, String json) {
-	    HttpEntity<String> requestEntity = new HttpEntity<String>(json, headers);
-	    ResponseEntity<String> responseEntity = rest.exchange(server + uri, HttpMethod.PUT, requestEntity, String.class);
-	    this.setStatus(responseEntity.getStatusCode());    
-	  }
-
-	  public void delete(String uri) {
-	    HttpEntity<String> requestEntity = new HttpEntity<String>("", headers);
-	    ResponseEntity<String> responseEntity = rest.exchange(server + uri, HttpMethod.DELETE, requestEntity, String.class);
-	    this.setStatus(responseEntity.getStatusCode());
 	  }
 
 	  public HttpStatus getStatus() {
