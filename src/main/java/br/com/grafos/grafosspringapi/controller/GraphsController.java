@@ -6,27 +6,30 @@ import com.google.gson.JsonObject;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import br.com.grafos.grafosspringapi.services.BuildGraphsTools;
 import br.com.grafos.grafosspringapi.services.GraphsServices;
 import br.com.grafos.grafosspringapi.services.InputServices;
-
+@CrossOrigin
 @RestController
 @RequestMapping("/grafos")
 public class GraphsController {
+	private JsonObject cnpjEmpresas = new JsonObject();
 	private InputServices inputServices = new InputServices();
 	private GraphsServices graphsServices = new GraphsServices();
 	private BuildGraphsTools buildGraphsTools = new BuildGraphsTools();
-	
+	@CrossOrigin
 	@GetMapping("/helloWorld")
 	public String helloWorld() {
 		return "hello world"; 
 	}
-	
-	@GetMapping
+	@CrossOrigin
+	@PostMapping
 	public ResponseEntity<String> createGraphs(InputStream data) {
 		JsonObject body = this.inputServices.readInputStreamData(data);
 		String id = body.get("id").getAsString();
