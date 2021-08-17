@@ -1,5 +1,6 @@
 package br.com.grafos.grafosspringapi.services;
 
+import org.apache.jasper.tagplugins.jstl.core.If;
 import org.springframework.http.ResponseEntity;
 
 import java.util.LinkedList;
@@ -67,10 +68,9 @@ public class GraphsServices {
 				if (type.equals("empresa")) {
 
 					JsonArray partners = buildGraphsTools.businessPartnersRequest(id, restClient, index);
-
 					for (int count = 0; count < partners.size(); count++) {
 						JsonObject partner = partners.get(count).getAsJsonObject();
-						id = partner.get("cnpj_cpfSocio").getAsString();
+						id = partner.get("cnpj_cpfSocio").getAsString() + "_" + partner.get("nomeSocio").getAsString();
 						if (!buildGraphsTools.verifyExists(nodes, id)) {
 							name = partner.get("nomeSocio").getAsString();
 							type = buildGraphsTools.detectType(id);
@@ -90,7 +90,6 @@ public class GraphsServices {
 				} else {
 					// this is a people node.
 					JsonArray companies = buildGraphsTools.partnersBusinessRequest(currentNode, restClient, index);
-					System.out.println("aaaaaaaaaaaa " + companies.toString());
 					for (int count = 0; count < companies.size(); count++) {
 						JsonObject company = companies.get(count).getAsJsonObject();
 						id = company.get("cnpj").getAsString();
@@ -121,6 +120,9 @@ public class GraphsServices {
 
 	public JsonObject setUpNode(String id, String name, int size, String type, String index, int level,
 			RestClient restClient) {
+		
+		id = buildGraphsTools.getPartnerCompanyCnpj(id);
+
 		JsonObject node = new JsonObject();
 		node.addProperty("id", id);
 		node.addProperty("label", name);
@@ -135,6 +137,8 @@ public class GraphsServices {
 		}
 		return node;
 	}
+
+	
 
 	public JsonObject setUpEdge(JsonObject nodeOrigin, JsonObject nodeTarget) {
 

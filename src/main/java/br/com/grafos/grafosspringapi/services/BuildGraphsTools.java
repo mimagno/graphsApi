@@ -152,4 +152,22 @@ public class BuildGraphsTools {
 		String type = detectType(id);
 		return type;
 	}
+
+	private String isCompany(String id){
+		String[] newId = id.split("_");
+		if (newId[0].length() == 14) {
+			return newId[0];
+		} else{
+			return id;
+		}
+	}
+
+	public String getPartnerCompanyCnpj(String id) {
+		if (id.contains("_")){
+			if (!id.substring(0, 11).contains("*")){
+			id = isCompany(id);
+			}
+		}
+		return id;
+	}
 }
