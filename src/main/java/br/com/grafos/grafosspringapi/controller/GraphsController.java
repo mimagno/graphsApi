@@ -19,7 +19,6 @@ import br.com.grafos.grafosspringapi.services.InputServices;
 @RestController
 @RequestMapping("/grafos")
 public class GraphsController {
-	private JsonObject cnpjEmpresas = new JsonObject();
 	private InputServices inputServices = new InputServices();
 	private GraphsServices graphsServices = new GraphsServices();
 	private BuildGraphsTools buildGraphsTools = new BuildGraphsTools();

@@ -3,21 +3,19 @@ package br.com.grafos.grafosspringapi.services;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-
-
 import org.springframework.http.ResponseEntity;
-
 import br.com.grafos.grafosspringapi.Util.RestClient;
 
+@SuppressWarnings("deprecation")
 public class BuildGraphsTools {
 
 	private JsonParser parser = new JsonParser();
 
 	public String detectType(String id) {
-		String type;
+		String type = null;
 		if (id.indexOf('*') > -1) {
 			type = "pessoa";
-		} else {
+		} else if (id.length() == 14){
 			type = "empresa";
 		}
 		return type;
@@ -25,12 +23,9 @@ public class BuildGraphsTools {
 
 	public String getCompanySituation(String id, RestClient restClient, String index) {
 		String query = "{\"size\":1000,\"query\":{\"bool\":{\"must\":[{\"match\":{\"cnpj.keyword\":\"" + id +"\"}}]}}}";
-		ResponseEntity<?> requestResponse = restClient.post(index + "/_search", query);
 
-		JsonObject bodyResponse = this.parser.parse((String) requestResponse.getBody()).getAsJsonObject();
-
-		JsonArray hits = bodyResponse.get("hits").getAsJsonObject().get("hits").getAsJsonArray();
-
+		JsonArray hits = sourceRequest(query, restClient, index);
+				
 		JsonObject hit = hits.get(0).getAsJsonObject();
 
 		String sutuation = hit.get("_source").getAsJsonObject().get("situacaoCadastral").getAsString();
@@ -57,12 +52,9 @@ public class BuildGraphsTools {
 	public JsonArray businessPartnersRequest(String cnpj, RestClient restClient, String index) {
 		String query = "{\"size\":1000,\"query\":{\"bool\":{\"must\":[{\"match\":{\"cnpj.keyword\":\"" + cnpj
 				+ "\"}}]}}}";
-
-		ResponseEntity<?> requestResponse = restClient.post(index + "/_search", query);
-		JsonObject requestResponseJson = this.parser.parse((String) requestResponse.getBody()).getAsJsonObject();
-		JsonObject hits = requestResponseJson.get("hits").getAsJsonObject();
-		JsonArray company = hits.get("hits").getAsJsonArray();
-
+	
+		JsonArray company = sourceRequest(query, restClient, index);
+		
 		JsonObject fullDocument = company.get(0).getAsJsonObject();
 		JsonObject sourceDocument = fullDocument.get("_source").getAsJsonObject();
 		JsonArray businessPartenrsArray = sourceDocument.get("socios").getAsJsonArray();
@@ -81,10 +73,8 @@ public class BuildGraphsTools {
 		String query ="{\"size\":1000, \"query\":{\"bool\":{\"must\":[{\"match\":{\"socios.nomeSocio.keyword\":\"" + partner.get("label").getAsString() + "\"}},"
 		+ "{\"match\":{\"socios.cnpj_cpfSocio.keyword\":\"" + splitId(partner.get("id").getAsString()) + "\"}},"
 		+ "{\"match\":{\"matriz_filial.keyword\":\"MATRIZ\"}}]}}}";
-		ResponseEntity<?> requestResponse = restClient.post(index + "/_search", query);
-
-		JsonObject bodyResponse = this.parser.parse((String) requestResponse.getBody()).getAsJsonObject();
-		JsonArray hits = bodyResponse.get("hits").getAsJsonObject().get("hits").getAsJsonArray();
+		
+		JsonArray hits = sourceRequest(query, restClient, index);
 		
 		return hits;
 	}

@@ -8,14 +8,14 @@ import org.springframework.web.client.RestTemplate;
 
 public class RestClient {
 
-	private String server = "http://xtr-verde.consiste.com.br:9200/";
+	private String server;
 	private RestTemplate rest;
 	private HttpHeaders headers;
 
 	public RestClient() {
 		this.rest = new RestTemplate();
 		this.headers = new HttpHeaders();
-		this.server = "http://xtr-verde.consiste.com.br:9200/";
+		this.server = "productionServerURL";
 		headers.add("Content-Type", "application/json;charset=UTF-8");
 		headers.add("Accept", "*/*");
 	}
@@ -28,11 +28,10 @@ public class RestClient {
 		headers.add("Accept", "*/*");
 	}
 	
-	  public ResponseEntity<?> post(String uri, String json) {   
+		public ResponseEntity<?> post(String uri, String json) {   
 	    HttpEntity<String> requestEntity = new HttpEntity<String>(json, headers);
 	    ResponseEntity<String> responseEntity = rest.exchange(server + uri, HttpMethod.POST, requestEntity, String.class);
 	    return responseEntity;
 	  }
-
 }
 

@@ -1,17 +1,9 @@
 package br.com.grafos.grafosspringapi.services;
-
-import org.springframework.http.ResponseEntity;
-
 import java.util.LinkedList;
 import java.util.Queue;
-
 import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-
 import br.com.grafos.grafosspringapi.Util.RestClient;
-import ch.qos.logback.core.recovery.ResilientSyslogOutputStream;
-
 public class GraphsServices {
 
 	private int size = 0;
@@ -47,8 +39,10 @@ public class GraphsServices {
 			JsonObject company = buildGraphsTools.getMatrizCompany(id, name, restClient, index);
 			id = company.get("cnpj").getAsString();
 			name = company.get("companyName").getAsString();
+			type = type + "node";
 			rootNode = this.setUpNode(id, name, this.size, type, index, level, restClient);
 		} else {
+			type = type + "node";
 			rootNode = this.setUpNode(id, name, this.size, type, index, level, restClient);
 		}
 
@@ -72,28 +66,28 @@ public class GraphsServices {
 
 					for (int count = 0; count < partners.size(); count++) {
 						JsonObject partner = partners.get(count).getAsJsonObject();
-						if (partner.get("cnpj_cpfSocio").getAsString().length() == 14) {
-							id = partner.get("cnpj_cpfSocio").getAsString();
-						} else {
-							id = partner.get("cnpj_cpfSocio").getAsString() + "_"
-									+ partner.get("nomeSocio").getAsString();
-						}
-						if (!buildGraphsTools.verifyExists(nodes, id)) {
-							name = partner.get("nomeSocio").getAsString();
-							type = buildGraphsTools.detectType(id);
 
-							partner = setUpNode(id, name, size, type, index, level, restClient);
+						if (!partner.get("cnpj_cpfSocio").getAsString().isEmpty()) {
 
-							nodes.add(partner);
+							id = getCorrectId(partner);
 
-							queueNodes.add(partner);
-							edge = setUpEdge(partner, currentNode);
+							if (!buildGraphsTools.verifyExists(nodes, id)) {
+								name = partner.get("nomeSocio").getAsString();
+								type = buildGraphsTools.detectType(id);
 
-							edges.add(edge);
+								partner = setUpNode(id, name, size, type, index, level, restClient);
 
-						} else {
+								nodes.add(partner);
 
-							getOtherEdgesFromCompany(restClient, edges, id, index, currentNode, nodeExisting);
+								queueNodes.add(partner);
+								edge = setUpEdge(partner, currentNode);
+
+								edges.add(edge);
+
+							} else {
+
+								getOtherEdgesFromCompany(restClient, edges, id, index, currentNode, nodeExisting);
+							}
 						}
 					}
 				} else {
@@ -124,14 +118,22 @@ public class GraphsServices {
 				}
 			}
 		}
-		
+
 		graph.add("nodes", nodes);
 		graph.add("edges", edges);
 
 		return graph;
 	}
 
-	
+	public String getCorrectId(JsonObject partner) {
+		String id;
+		if (partner.get("cnpj_cpfSocio").getAsString().length() == 14) {
+			id = partner.get("cnpj_cpfSocio").getAsString();
+		} else {
+			id = partner.get("cnpj_cpfSocio").getAsString() + "_" + partner.get("nomeSocio").getAsString();
+		}
+		return id;
+	}
 
 	public JsonObject setUpNode(String id, String name, int size, String type, String index, int level,
 			RestClient restClient) {
@@ -141,7 +143,7 @@ public class GraphsServices {
 		node.addProperty("size", size);
 		node.addProperty("tipo", type);
 		node.addProperty("level", level);
-		if (node.get("tipo").getAsString().equals("pessoa")) {
+		if (node.get("tipo").getAsString().equals("pessoa") || node.get("tipo").getAsString().equals("pessoanode")) {
 			node.addProperty("color", this.corPessoa);
 		} else {
 			node.addProperty("color",
@@ -159,31 +161,33 @@ public class GraphsServices {
 		edge.addProperty("target", nodeTarget.get("id").getAsString());
 		edge.addProperty("label", " ");
 		// IF YOU CHANGE THIS VALUE IT IS CURVED OR STRAIGHT
-		edge.addProperty("type", "arrow");
+		edge.addProperty("type", "curvedArrow");
 		edge.addProperty("size", 1);
 		edge.addProperty("color", nodeTarget.get("color").getAsString());
 
 		return edge;
 
 	}
-	
+
 	public void getOtherEdgesFromPeoples(RestClient restClient, JsonArray edges, String id, String index,
 			JsonObject currentNode, JsonObject nodeExisting) {
 		String type;
 		JsonObject edge;
 		if (!buildGraphsTools.verifyExists(edges, id + "_" + currentNode.get("id").getAsString())) {
-			type = buildGraphsTools.detectType(id);
-			if (type.equals("pessoa")) {
-				nodeExisting.addProperty("color", this.corPessoa);
-			} else {
-				nodeExisting.addProperty("color", buildGraphsTools
-						.getColor(buildGraphsTools.getCompanySituation(id, restClient, index)));
+			if (!buildGraphsTools.verifyExists(edges, currentNode.get("id").getAsString() + "_" + id)) {
+				type = buildGraphsTools.detectType(id);
+				if (type.equals("pessoa")) {
+					nodeExisting.addProperty("color", this.corPessoa);
+				} else {
+					nodeExisting.addProperty("color",
+							buildGraphsTools.getColor(buildGraphsTools.getCompanySituation(id, restClient, index)));
+				}
+				nodeExisting.addProperty("id", id);
+				edge = setUpEdge(currentNode, nodeExisting);
+				nodeExisting.remove("id");
+				nodeExisting.remove("color");
+				edges.add(edge);
 			}
-			nodeExisting.addProperty("id", id);
-			edge = setUpEdge(currentNode, nodeExisting);
-			nodeExisting.remove("id");
-			nodeExisting.remove("color");
-			edges.add(edge);
 		}
 	}
 
@@ -192,26 +196,29 @@ public class GraphsServices {
 		String type;
 		JsonObject edge;
 		if (!buildGraphsTools.verifyExists(edges, currentNode.get("id").getAsString() + "_" + id)) {
-			type = buildGraphsTools.detectType(id);
-			if (type.equals("pessoa")) {
-				nodeExisting.addProperty("color", this.corPessoa);
-			} else {
-				nodeExisting.addProperty("color", buildGraphsTools
-						.getColor(buildGraphsTools.getCompanySituation(id, restClient, index)));
+			if (!buildGraphsTools.verifyExists(edges, id + "_" + currentNode.get("id").getAsString())) {
+				type = buildGraphsTools.detectType(id);
+				if (type.equals("pessoa")) {
+					nodeExisting.addProperty("color", this.corPessoa);
+				} else {
+					nodeExisting.addProperty("color",
+							buildGraphsTools.getColor(buildGraphsTools.getCompanySituation(id, restClient, index)));
+				}
+				nodeExisting.addProperty("id", id);
+				edge = setUpEdge(currentNode, nodeExisting);
+				nodeExisting.remove("id");
+				nodeExisting.remove("color");
+				edges.add(edge);
 			}
-			nodeExisting.addProperty("id", id);
-			edge = setUpEdge(currentNode, nodeExisting);
-			nodeExisting.remove("id");
-			nodeExisting.remove("color");
-			edges.add(edge);
 		}
 	}
 
 	private RestClient buildClientForGraphs(String indiceTitle) {
 		RestClient restClient;
 		if (indiceTitle.contains("*")) {
-			restClient = new RestClient("http://xtrdb01.consiste.com.br:9200/");
+			restClient = new RestClient("anyOtherServer");
 		} else {
+			//the application will use the production server
 			restClient = new RestClient();
 		}
 		return restClient;
