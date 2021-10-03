@@ -1,6 +1,9 @@
 package br.com.grafos.grafosspringapi.services;
+import java.io.InputStream;
 import java.util.LinkedList;
 import java.util.Queue;
+
+import br.com.grafos.grafosspringapi.exception.UnsuportedParamsException;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import br.com.grafos.grafosspringapi.Util.RestClient;
@@ -9,6 +12,18 @@ public class GraphsServices {
 	private int size = 0;
 	private String corPessoa = "#1C75CF";
 	private BuildGraphsTools buildGraphsTools = new BuildGraphsTools();
+	private InputServices inputServices = new InputServices();
+
+
+	public Object getGraphs(InputStream data) throws UnsuportedParamsException {
+		JsonObject body = this.inputServices.readInputStreamData(data);
+		String id = body.get("id").getAsString();
+		String type = buildGraphsTools.detectType(id);
+		if (type.equals("empresa") || type.equals("pessoa")) {
+			return buildGraphs(body, type);
+		}
+		throw new UnsuportedParamsException();
+	}
 
 	public JsonObject buildGraphs(JsonObject body, String type) {
 		int tier = body.get("camada").getAsInt();
